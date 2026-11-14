@@ -1,34 +1,29 @@
 package frc.robot.subsystems;
 
-import static edu.wpi.first.units.Units.Amps;
-import static edu.wpi.first.units.Units.Kilograms;
-import static edu.wpi.first.units.Units.Meters;
-import static edu.wpi.first.units.Units.MetersPerSecond;
-import static edu.wpi.first.units.Units.Seconds;
+import static org.wpilib.units.Units.Amps;
+import static org.wpilib.units.Units.Kilograms;
+import static org.wpilib.units.Units.Meters;
+import static org.wpilib.units.Units.MetersPerSecond;
+import static org.wpilib.units.Units.Seconds;
 
 import com.revrobotics.spark.SparkLowLevel.MotorType;
-import com.thrifty.core.MotorConfig;
 import com.revrobotics.spark.SparkMax;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
-import edu.wpi.first.math.controller.ElevatorFeedforward;
-import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.units.measure.Distance;
-import yams.motorcontrollers.SmartMotorControllerConfig;
-import yams.mechanisms.positional.Elevator;
-import yams.gearing.MechanismGearing;
-import yams.mechanisms.config.ElevatorConfig;
-import yams.motorcontrollers.SmartMotorController;
-import yams.motorcontrollers.SmartMotorControllerConfig.ControlMode;
-import yams.motorcontrollers.SmartMotorControllerConfig.MotorMode;
-import yams.motorcontrollers.local.SparkWrapper;
-import yams.motorcontrollers.SmartMotorControllerConfig.TelemetryVerbosity;
-import yams.telemetry.SmartMotorControllerTelemetry;
-import yams.telemetry.SmartMotorControllerTelemetryConfig;
-import frc.robot.Telemetry;
-import yams.motorcontrollers.SmartMotorControllerCommandRegistry;
-
+import org.wpilib.command2.Command;
+import org.wpilib.command2.SubsystemBase;
+import org.wpilib.command2.button.Trigger;
+import org.wpilib.hardware.bus.CANPort;
+import org.wpilib.math.controller.ElevatorFeedforward;
+import org.wpilib.math.system.DCMotor;
+import org.wpilib.units.measure.Distance;
+import yams.commands2.config.SmartMotorControllerConfig;
+import yams.commands2.mechanisms.Elevator;
+import yams.core.gearing.MechanismGearing;
+import yams.core.mechanisms.config.ElevatorConfig;
+import yams.core.motorcontrollers.SmartMotorController;
+import yams.core.motorcontrollers.enums.ControlMode;
+import yams.core.motorcontrollers.enums.MotorMode;
+import yams.core.motorcontrollers.local.SparkWrapper;
+import yams.core.telemetry.enums.TelemetryVerbosity;
 
 /**
  * An elevator driven by a NEO through a SparkMAX, using YAMS.
@@ -38,10 +33,10 @@ public class ElevatorSubsystem extends SubsystemBase {
 
   // The vendor motor controller object: a SPARK MAX with CAN ID 1 on CAN bus CAN_S0.
   private final SparkMax spark = new SparkMax(
+    CANPort.CAN_S0,
     1,
     MotorType.kBrushless
   );
-
 
   // What the motor controller should do: its control mode, gains, gearing and limits.
   private final SmartMotorControllerConfig smcConfig =
@@ -51,19 +46,21 @@ public class ElevatorSubsystem extends SubsystemBase {
       // With this set, the gains and limits are in meters.
       .withMechanismCircumference(Meters.of(0.0254).times(2 * Math.PI))
       // Feedback constants (PID), in volts per meter of error, on the real robot and in simulation.
-      .withSimClosedLoopController(50, 0.0, 0.0)
+      // .withClosedLoopController(50.0, 0.0, 0.0)
+      .withSimClosedLoopController(50.0, 0.0, 0.0)
       // The fastest the closed loop is allowed to move and accelerate the elevator.
       // Feedforward constants, in volts per meter per second, on the real robot and in simulation.
+      // .withFeedforward(new ElevatorFeedforward(0.0, 0.0, 0.0, 0.0))
       .withSimFeedforward(new ElevatorFeedforward(0.0, 0.0, 0.0, 0.0))
       // Gearing from the motor rotor to the drum: 15.0 motor rotations per turn of it.
       .withGearing(new MechanismGearing(15.0))
       .withMotorInverted(false)
-      .withIdleMode(MotorMode.BRAKE)
+      .withZeroPower(MotorMode.BRAKE)
       .withStatorCurrentLimit(Amps.of(40.0))
       // Where the carriage is when the robot turns on.
       .withStartingPosition(Meters.of(0.0))
       // Telemetry name and how much to publish.
-          .withTelemetry("ElevatorSubsystem", Telemetry.telemetryVerbosity.yamsVerbosity);
+      .withTelemetry("ElevatorSubsystemMotor", TelemetryVerbosity.HIGH);
 
   // The SmartMotorController applies the config to the SPARK MAX, which drives one NEO.
   private final SmartMotorController motor = new SparkWrapper(
@@ -72,26 +69,18 @@ public class ElevatorSubsystem extends SubsystemBase {
     smcConfig
   );
 
-  
-
   private final ElevatorConfig elevatorConfig = new ElevatorConfig()
     // The hard stops, used by the simulation.
-    .withHardLimits(Meters.of(0.0), Meters.of(2.0))
+    .withHardLimits(Meters.of(0.0), Meters.of(1.0))
     // The mass of the carriage, used by the simulation.
-    .withCarriageWeight(Kilograms.of(15.0))
+    .withCarriageWeight(Kilograms.of(5.0))
     // Telemetry name and how much to publish.
     .withTelemetry("ElevatorSubsystem", TelemetryVerbosity.HIGH);
 
   // The elevator mechanism.
-  private final Elevator elevator;
+  private final Elevator elevator = new Elevator(elevatorConfig, motor);
 
-  public ElevatorSubsystem() {
-    elevator = new Elevator(elevatorConfig, motor);
-
-    SmartMotorControllerCommandRegistry.addCommand("Live Tuning", this, smcConfig.
-    );
-  }
-
+  public ElevatorSubsystem() {}
 
   /** Go to a height and hold it. This command does not end on its own. */
   public Command run(Distance height) {
@@ -110,7 +99,7 @@ public class ElevatorSubsystem extends SubsystemBase {
 
   /** True while the carriage is within a tolerance of a height. */
   public Trigger near(Distance height, Distance tolerance) {
-    return elevator.isNear(height, tolerance);
+    return elevator.near(height, tolerance);
   }
 
   @Override
@@ -123,6 +112,5 @@ public class ElevatorSubsystem extends SubsystemBase {
   public void simulationPeriodic() {
     // Runs the elevator's physics simulation.
     elevator.simIterate();
-    elevator.updateTelemetry();
   }
 }

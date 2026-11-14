@@ -9,7 +9,7 @@
 
 package frc.robot;
 
-import edu.wpi.first.wpilibj.RobotBase;
+import org.wpilib.framework.RobotBase;
 
 public final class Main
 {
@@ -17,6 +17,6 @@ public final class Main
 
   public static void main(String... args)
   {
-    RobotBase.startRobot(Match::new);
+    final Robot robot = new Robot();
   }
 }
